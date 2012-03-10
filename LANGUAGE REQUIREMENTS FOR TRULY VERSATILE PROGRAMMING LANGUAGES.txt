@@ -205,7 +205,19 @@ Trees (N-ary, N is fixed at compile time)
 Trees (N-ary, N is fixed at run time)
 Trees (N-ary, N varies dynamically on a per-node basis)
 
-	
+
+
+42.2. The language must provide ways to make instances of some types read-only, either permanently or temporarily in a context.
+42.2.1. Constants are read-only all the time after they are initialized. Constants can be declared inside any scope and are visible in that scope and in the scope of closures.
+42.2.2. Constants may be passed only as IN parameters (not as OUT or INOUT parameters). They may be returned from functions, of course only as constant rvalues (wouldn't be constants otherwise). It is an error to return an object which is in read-only mode as a read-write temporary.
+42.2.3. References which are not of read-only mode cannot point to constants (compilation error).
+42.2.4. Objects may be put into read-only mode in any piece of code, and until the read-write mode is restored, the compiler treats them and any references derived from them as if they were pointing to constants. This is very useful for debugging, preventing accidental modification in unknown/foreign modules and routines, and for safe concurrent/parallel constructs. Such access mode change does *not* incur run-time overheads, as the protection is enforced entirely at compile time by the compiler by simply injecting the two mode change commands into the access checker and applying the usual checks for constants.
+42.3. Capture specifications of closures/lambda functions must fully respect read-only mode of captured objects.
+
+42.4. By default, return values are treated as constant rvalues. This is done to prevent errors which involve modifying a rvalue and discarding it. 
+
+
+
 43. Allocation and deallocation of memory and other resources :
 43.1. The language must provide support for several types/modes of garbage collection. The language must provide support for mixing uses of the several collectors (!!! Tricky).
 43.2. The language must provide finalization/destructor support in all GC modes.
@@ -230,3 +242,29 @@ The compiler must provide a flag to forbid any true dynamic allocation (i.e. fro
 
 
 
+44. Type parametrism and parametric types
+The language must in general operate on the basis of duck-typing (which is what Go and Python and many other relatively convenient languages do), i.e. judge types by their interfaces, and not by their name (which is what predominantly nominally-typed languages like C++ and Java do). Therefore, clumsy templates as in C++ are definitely not needed. In fact, every parameter in a function/method/struct/class declaration which is left untyped (either explicitly or via a chain of automatic type inference) can simply be assumed to be of "any suitable type", which means of any type that supports the interfaces/operations/capabilities which are required of the type to carry out what is asked of it. For example, if we have a function "add(IN x, y) { return x+y }" what it actually tells any human and the compiler is that two parameters are taken in read-only mode (so it's a pure function) and then the abstract operation "+" is applied to them, and then the result (whatever it is) is returned. Typically the "+" operation is associated with adding or aggregating or growing things, but actually it can be anything depending on the types. As specified, the two parameters may be of the same type or of different types, which makes the following things possible and elegant:
+- adding two integers or floats (primitive types);
+- adding two arbitrary-precision numerical types (BigIntegerS, BigDecimalS, or anything similar);
+- concatenating strings;
+- concatenating lists, growable arrays/vectors, maps, sets, or actually any two compatible containers!;
+- adding/appending an instance of a type to a container;
+- appending the textual representation of an instance of a type to a string as long as the type has a TextString() conversion operator;
+If restricitng the types is needed or considered better, it can be done in a very simple way:
+- "add ( IN x, y only <<Type>>), e.g. add (IN x, y  only int32)"
+- "add ( IN x only <<Type1>>, y only <<Type2>>)", with Type1 possibly the same as type Type2.
+
+In declarations of structs, it must work similarly and can do so without much complication:
+- "struct Triple { first, second, third }" meaning the types of first, second, third members may be any types whatsoever (this is similar to what C++ pair and tuple templates do, but they are declared clumsily and are accessed using template syntax)
+- Partial or complete type restrictions as before.
+In declaration of classes (the more abstract cousins of the plain old structs), the approach is similar, only there the type inference engine will have more work to do because of things like derived field and method members and properties which must all be type-consistent).
+
+When using this parametrism, most of the time there will be no need to explicitly state what the types need to be - just pass in the input parameters to the function, method, or class constructor, and assign the result to an uto-typed variable - the type inference engine will do the rest. Copying the type off of an already existing object is also easy using the <<object>>.Type property (which acts like a typeof/typeid operator). When this is not sufficient, an explicit type specification syntax such as in C++ template instantiation or Java generics instantiation must be provided.
+
+Sepcializations similar to C++ template specializations must also be supported. They are achieved by dropping the "only" keyword in the type specification. 
+
+44.2. Overloading
+Due to the implicit type parametrism already described, a lot of things are already overloaded. Overloading with different numbers of arguments and different sequences of restricted type signatures and possibly specializations are all permitted, somewhat similar to C++. There are some differences though, related to named parameters and defaulted (named) parameters. Parameters passed into anything must either all be named or all without names. When not all parameters are used (i.e. some are left to take either their type-default values or whatever default values have been given in the entity being called with them), only named parameters are allowed, to provide for reduced confusion probability and for great flexibility and readability. Essentially, this means that only what is really necessary for a particular call has to be mentioned by the human, and in arbitrary order, which is much better than having several NULLs or 0s or falseS or empty iterators in a fixed-order long parameter list.
+
+Overload resolution rules are different from e.g. C++ as there is NO IMPLICIT CONVERSION BETWEEN TYPES.
+Rule 1: 
