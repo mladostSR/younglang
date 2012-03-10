@@ -263,8 +263,15 @@ When using this parametrism, most of the time there will be no need to explicitl
 
 Sepcializations similar to C++ template specializations must also be supported. They are achieved by dropping the "only" keyword in the type specification. 
 
-44.2. Overloading
+44.2. Overloading : NOT A GOOD THING THIS WAY, REVISE AND SIMPLIFY!!! C++ overloading often creates confusion as a human can't always predict which overloaded variant the language rules and the actual compiler will match. Even without implicit conversions between types, it's still a mess sometimes.
 Due to the implicit type parametrism already described, a lot of things are already overloaded. Overloading with different numbers of arguments and different sequences of restricted type signatures and possibly specializations are all permitted, somewhat similar to C++. There are some differences though, related to named parameters and defaulted (named) parameters. Parameters passed into anything must either all be named or all without names. When not all parameters are used (i.e. some are left to take either their type-default values or whatever default values have been given in the entity being called with them), only named parameters are allowed, to provide for reduced confusion probability and for great flexibility and readability. Essentially, this means that only what is really necessary for a particular call has to be mentioned by the human, and in arbitrary order, which is much better than having several NULLs or 0s or falseS or empty iterators in a fixed-order long parameter list.
 
 Overload resolution rules are different from e.g. C++ as there is NO IMPLICIT CONVERSION BETWEEN TYPES.
-Rule 1: 
+Rule 1: First, all potentially applicable declarations of the symbol name in the compilation unit (normally the module, unless the coe is being entered interactively at a prompt) are loaded into a table. In the source code, they must always be declared contiguously, i.e. one after the other with no other declarations in-between.
+Rule 2: The variants which have the same number of formal parameters (no matter defaulted or not) are grouped together.
+Rule 3: If there are variants whose 
+
+any any
+int int
+any int
+int any
