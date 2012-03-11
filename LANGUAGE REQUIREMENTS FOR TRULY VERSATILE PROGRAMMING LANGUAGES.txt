@@ -292,7 +292,29 @@ It is noted that the formal parameter list and the rearranged argument list must
 
 One thing which the scheme does not support is having a choice of several listed types and not a single possible fixed type for a parameter. It only allows having several specializations but they are not exclusive - an auto typing is always tried after the specializations list is exhausted. In this way, it is impossible to say "this formal parameter is allowed to be only of this OR that OR that type, but nothing else". Is this a drawback? Experience with the language will show. Support can be added relatively easily (using "only" keyword + choice statement on the types).
 
-44.3. 
+44.3. Class type type parametrism : based on method and property parametrism, which are essentially function parametrism + some more work for the type inference engine.
+
+
+45. Choice statements (similar to switch statements in other languages, mostly C++ and Go)
+The switch statements in C, C++, Java are quite limited and mostly focused on simpler uses and the simple generation of machine-efficient code. This is not a bad thing, but is definitely not general enough to be compellingly better over a sequence or nesting of if-else statements.
+The Go language breaks from these traditions and attempts to make switch statements more of flexible choice statements than a mostly redundant language feature. Its example should be followed, at least partially.
+
+This language's "choice" statements are motivated as follows:
+- They must allow effective (rich, easy, compact) expression of the general concept of choice. They must not be limited to dealing with integer types only or with a single variable only or with variables and values of only one type per choice statement.
+- They must not become chaotic.
+- They must help the compiler and other checking tools performs code analysis and checks such as ensuring that all possible values of the expression(s) are covered by some branch, that no side effects can happen in a surprising way, etc.
+
+//head begins
+choice x, y, z	//All of the objects being used in the body of the choice must be listed in its head
+	criterion label_1: expression (NOT a statement! NOT allowed to contained to have any side effects!)
+	criterion label_2: expression
+	...
+//end of head	
+//body begins
+	
+
+
+//end of body
 
 
 any any
