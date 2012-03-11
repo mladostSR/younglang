@@ -116,6 +116,8 @@ def enumeration Months { Jan, Feb, ..., Dec } //The abstract part of the declara
 	with synonyms { January, February, ..., December }, { JAN, FEB, ..., DEC };
 end enumeration
 
+- Enumerations can be declared as "ordered", i.e. "def ordered enumeration BlahBlah ... ", in which case the declaration order of their members' names is considered meaningful. This is useful if we want to use them in < or > comparisons or in range expressions (otherwise it's forbidden).
+
 OK, there's the problem of e.g. an int interpretation which counts from 0 and one which counts from 1. How to avoid mixing things up => outright bugs, esp. when combining modules of different origin? One solution is to simply not allow an interpretation of a a certain type to have two versions anywhere in an entire program (and a single module). But then actually it must be about an entire type of types, so conflicts between int32 and int8 or int16 must not occur. This will often less work, but will mean forcing a convention where it may not be the only meaningful one. Also, what would happen if one module (from maker A) uses one interpretation, and another module (from maker B) uses an incompatible interpreration -- and the client need to use the modules together? A better solution than the previous suggestion would be to have the compiler/linker spot the differences and refuse to link them, thus forcing the client to always use a the module name as prefix. But then, how do we know which convention was used for a value coming from somewhere distant and possibly unknown (e.g. from a compact representation saved somewhere on disk)? In general, that can't be solved. For inter-module communication, the only safe thing is to enforce a common (== single) definition of any thing, i.e. add a rule to the language that:
 --> Language Rule : If more than 1 module in a program or program system (bunch of consistently interfaced programs, whose final executables before symbol strip must be checked for mutual consistency by the consistency checker tool) use a public entity of the same simple name (unqualified name, i.e. with all qualifiers like module name ignored), then  all publicly visible non-overload definitions (full interfaces) of the various entities must either be exactly the same (after canonicalization : reordering and similar, but *not* renaming of any sort), or it is an error. THIS ACTUALLY ENCOURAGES the application of the SAY IT ONCE AND ONCE ONLY principle!
 
@@ -297,25 +299,43 @@ One thing which the scheme does not support is having a choice of several listed
 
 45. Choice statements (similar to switch statements in other languages, mostly C++ and Go)
 The switch statements in C, C++, Java are quite limited and mostly focused on simpler uses and the simple generation of machine-efficient code. This is not a bad thing, but is definitely not general enough to be compellingly better over a sequence or nesting of if-else statements.
-The Go language breaks from these traditions and attempts to make switch statements more of flexible choice statements than a mostly redundant language feature. Its example should be followed, at least partially.
+The Go language breaks from these traditions and attempts to make switch statements more of flexible choice statements than a mostly redundant language feature. Its example should be followed, partially.
 
 This language's "choice" statements are motivated as follows:
 - They must allow effective (rich, easy, compact) expression of the general concept of choice. They must not be limited to dealing with integer types only or with a single variable only or with variables and values of only one type per choice statement.
 - They must not become chaotic.
-- They must help the compiler and other checking tools performs code analysis and checks such as ensuring that all possible values of the expression(s) are covered by some branch, that no side effects can happen in a surprising way, etc.
+- They must help the compiler and other checking tools performs code analysis and checks such as ensuring that all seemingly possible values of the expression(s) are covered by some branch (in general, it is not feasible to know what the true set of values of a complex expression is, or is at least a heavy procedure involving advanced verification/theorem prooving techniques and technologies!), that no side effects can happen in a surprising way, etc.
 
-//head begins
-choice x, y, z	//All of the objects being used in the body of the choice must be listed in its head
-	criterion label_1: expression (NOT a statement! NOT allowed to contained to have any side effects!)
-	criterion label_2: expression
-	...
-//end of head	
-//body begins
-	
+In order to have these properties, the choice construct is defined as follows:
+- It is nested, which means that complex, multilevel choice statements can be built recursively, by specifying a deeper choice statement as one or more of the matcher actions. Essentially, this makes the overall choice statement a decision tree.
+- Each particular choice statement chooses only over the values of a single expression. If other expressions need be considered, it can be de done at the next lower level choice statement and so on, recursively.
+- Any particular choice statement *and anything in its action rules, including nested choice statements* are *not* allowed to write to any of the variables/references which occur in the expression being the choosing is performed on. The compiler does it internally via the temporary mode change described earlier : the participating variables/references are set read-only before the expression is actually evaluated and are reset to their old mode after the end of the choice statement. This means that not even procedures called in actions can alter them behind the back of the compiler and human coder. The said expression is evaluated only once and its value is kept in an implicit scoped variable which is read-accessible in the actions as "value".
+- Inside an action of a choice statement, a special keyphrase is valid : "continue upper", which means "Don't exit the entire choice process (all levels!) but return to the next matcher (conditional) of the immediately encloding level of choice statement. This permits flexible flow when multiple matchers are expected to fire, as is the case in non-exclusive-or (XOR) situations. This can be tricky and can be abused, but if used carefully, it can be quite elegant. It must be allowed to forbid the option via a compiler flag.
+- There is no fallthrough; instead, when multiple values (a range or a non-contiguous set) are to be compared for (in)equality, the range/set syntax which is part of the language is used.
 
 
-//end of body
+e.g. (Definitely not the final syntax!!!) (and definitely a meaningless, dumb example!!!):
+choice x+y+sqrt(z)
+	<0.0 => choice text1.Len	//string length
+				0 => action1()
+				2 => action2()
+				default => error()
+			end choice t1
+	>0.0 and <10.0 => { write(stdout, value); continue upper }
+	in [10.0..11.0) => action3(value)	//numerical range object created inline; type auto-deduced to be the same float type as the choice expression
+	in [11.0..+infinity) => error()
+end choice x+y+sqrt(z)	
 
+
+46. Ranges and sets.
+An expressive language must have at least decent support for specifying ranges and more general discontiguous sets, at least of basic types (integers, floats, chars (!!! Unicode can be quite tricky for non-trivial uses!), and types trivially derived from them; enumerations must also be supported well -- they are a simpler case of sets!) and lists of values.
+- Ranges of floats (float32, float64, float128, and possibly others):
+'[' means a closed interval, ')' means an open interval, both ends are of the same type, default type is float64. +infinity and -infinity correspond to the respective IEEE754 entities for the type.
+The two ends of the interval are separated by "..", which is the same as the integer interval delimiter.
+- Ranges of integers:
+	Same notation as for floats, simply doing N..M *not* allowed so that there is no doubt about the ends (exclusive or inclusive). There are of course no infinities, instead properties <<typeName>>.Min or <<instanceName>>.Type.Min are used, resp. .Max .
+- Values of ordered enumerations are supported as ranges. Unordered (i.e. the default ones) are not.
+- O
 
 any any
 int int
