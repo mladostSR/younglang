@@ -346,6 +346,37 @@ The major question is which one(s) should the compiler support (and require) in 
 - Then, sets containing variables (mixable with constants, of course) will be supported.
 - Then, we'll see.
 
+The container/member iteration keyword "in" is used with the most obvious meaning possible.
+
+
+
+
+47. Module system and source layout in the file system.
+- The include-files-to-process-over-and-over-again is an enemy of reasonably fast compilation and must be avoided. Cutting tightly coupled units of code into many separate source files is either a bad thing in general or is no longer needed, even when several people are working on it, now that distributed SCM systems like Git exist. Consistent tightly coupled code is probably better created initially by a pair or single person, and not by large teams (and this is what happens in most cases anyway) - so, don't fragment it! Loading tons of small files is among the most effective compilation performance killers.
+- Modular software is a good thing.
+- Highly consistent software is a good thing.
+- Unambiguos references between pieces of software (and information in general) are a good thing.
+- Tedium is not a good thing. We've got machines to do tedious tasks and they do it better than humans.
+
+So:
+- The language organizes source code into *modules*, which are then put into *packages*. Modules are expected to be relatively small and self-contained pieces of code (but not as tiny as class plus perhaps a bunch of functions which can't do anything by themselves... except for providing parser food for #include-ing).
+- It is expected (and is normally done this way, at least in static compilation mode - when using a traditional compiler) that a module is a compilation unit. A module resides in *one* file, no more! A module has a higher-level interface to the outside world (other modules,essentially) than its small(er) ingredients : types, functions, variables, constants. A module exists to provide services to its clients.
+- Modules are the primary point of access permission control. Ingredients of a module which are in its public interface are usable by any other module whatsoever (no matter in which package it resides). Ones which are private to the module are only known and usable to/by other stuff in the module. Anything which is private to the module is not allowed to escape via the public interface, e.g. if a certain type which is declared private to the module but appears somewhere in the publci interface in a formal parameter, return type, or anything, it is an error. Private types and variables and constants may only be used (and relied upon) other entities from the same module.
+- The normal intended practice is to write the full code (not just some interface definition or the usual stuff that goes into a header file), see if and how it works, repeatedly modify it until it is satisfactory and has stabilized, and only then generate (just pass a flag to the compiler) a disitributable standalone interface definition/header file, while separating (to a certain extent) interface from implementation (and public information from "secret sauce"). Only to a certain extent, of course, because just like in C++ and other languages which support templates/generics, a lot of code has to go into places which are highly visible to the client's compiler. That's life. But it's an increasingly open-source world anyway. (OK, the amount of exposure can be limited somewhat, with things like precompiled variants of parametric code).
+- The normal intended practice is to bundle modules into packages, and for every program to have a main package, with a main module, where a main function resides (where execution of "useful", i.e. non-program-initialization code starts). Packages are what is supposed to be published for download, sold, installed, managed via package managers, etc. Not individual modules. Packages ??do not have any access control facilities??
+- Packages are represented in a file system as a directory with all the module files (+ module interface definition files/headers, if necessary). The MIFs may be (and usually should be, for file loading performance reasons) spliced into a per-package Package Combined MIFs => PCMIFs. The compiler and co. will first check to see if the PCMIF is available and only if not will they resort to dealing with MIFs one by one.
+- Compilation usually proceeds by first parsing the source code of the current unit of compilation (i.e. module file); the package, module, and import statements are of course at the beginning of it, so the compiler goes to load the the referred-to PCMIFs / MIFs. They are normally loaded in their entirety, as they shouldn't be that big for modern systems with several GBs of RAM *and* because they are very likely to be referred to in later compilation units. Caching is controlled by a caching manager.
+- Compilation then does parsing, instantiation, checks, some sort of code generation, and outputs messages and, of course, the new "object code" file (or rather an intermediate representation such as... yeah, C/C++ ! That's right!) and MIF. Caching may apply.
+- This is repeated until all the files given to the compiler driver at the command line have been processed. ??Check build dependencies and automatically build only what needs to be rebuilt.
+- Compilation of the IR code follows, using whatever suitable tools(s). Linking of the real object code follows. Hopefully there's a working executable in the end.
+48. Access permissions.
+49. Functions, methods, properties, functional objects and types, closures and lambda expressions, callables. Delegation.
+
+50. Loops, iteration and iterators. Container access and access to data in general. -> Accessors/accesses. Capabilities-based? Fail-fast?
+51.
+49. Tasking, concurrency, parallelism.
+Scheduling
+Non-blocking IO.
 
 
 any any
