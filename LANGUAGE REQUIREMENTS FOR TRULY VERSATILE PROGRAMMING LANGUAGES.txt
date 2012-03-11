@@ -268,19 +268,31 @@ Sepcializations similar to C++ template specializations must also be supported. 
 The language allows specializations for types, as often it makes sense or is necessary to have *implementation* versions which are tailored/optimized/adapted to the particular properties of a type, with the convention that the basic meaning and behaviour have to stay the same for all specilized variants (if they can't or shouldn't, it's simply a bad thing to use the same symbol name for them!). This is treated as an *implementation* detail, in contrast to C++, and is therefore put in the body of the function/method/property/class declaration/definition; of course, the compiler will note the variants of the interface, likely in a fashion akin to the mangling in C++, but that is done internally and should be somewhat transparent to the client programmer.
 
 The specialization syntax is something like this:
-def method op+ (x ResizableArray, y)
+def method op+ (x ResizableArray of y, y)	//Bound types : ResizableArray and transitively its contained array (reference) receive the type parameter of y. See the "Bound types" section for more details.
 	if y.Type == bool
 		//Do it compactly, by packing bits.
 	else
 		if x.Full
 			//Try to grow; if unsuccessful, Error...
 		else
-			x(pos) := y		//Type of x is used to deduce that the array and therefore the ResizableArray
+			x(pos) := y
 			x.pos++
 		end if
 	end if
 end method op+	//Not final syntax... just there.	
 
+The idea is that there may be common code shared by (some of) the specializations, and that it is better not to split stuff into several dependent but syntactically dispersed template specializations as in C++. Everything pertaining to an entity should be put in one place! Internally, the compiler is allowed to do whatever it takes to generate suitable code from the single definition, including any splitting or merging. Whatever can be done statically at compile time, must be. Conditionals on static types must generate code which has no runtime type checks and overhead, as specializations can be emitted at compile time.
+
+Specialization resolution :
+With this approach to overloading, resolving candidates is relatively simple.
+The formal parameter list is loaded from the declaration of the callable entity. The names of the parameters are the "primary" thing; if types are specified in the parameter list, they are affixed to the names - these named parameters can from now be only of the type. Specializations are extracted and affixed, then untyped parameters remain and are marked as such.
+The actual parameter list is taken from the call site and rearranged to match the declaration order, and the matching begins. The matching proceeds left-to-right. If the argument at the current position has the same type as the single-possible-type formal parameter, then matching continues with the next position, else error (match is impossible). If the formal parameter has the argument's type as one of the specializations, that sepcialization is selected and matching continues, else the same is done as for an auto type. If the formal parameter has an auto type, generation of code for that type is scheduled with the argument's type and matching continues.
+
+It is noted that the formal parameter list and the rearranged argument list must be of the same length (if not, they can't match at all).
+
+One thing which the scheme does not support is having a choice of several listed types and not a single possible fixed type for a parameter. It only allows having several specializations but they are not exclusive - an auto typing is always tried after the specializations list is exhausted. In this way, it is impossible to say "this formal parameter is allowed to be only of this OR that OR that type, but nothing else". Is this a drawback? Experience with the language will show. Support can be added relatively easily (using "only" keyword + choice statement on the types).
+
+44.3. 
 
 
 any any
