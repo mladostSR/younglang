@@ -263,13 +263,25 @@ When using this parametrism, most of the time there will be no need to explicitl
 
 Sepcializations similar to C++ template specializations must also be supported. They are achieved by dropping the "only" keyword in the type specification. 
 
-44.2. Overloading : NOT A GOOD THING THIS WAY, REVISE AND SIMPLIFY!!! C++ overloading often creates confusion as a human can't always predict which overloaded variant the language rules and the actual compiler will match. Even without implicit conversions between types, it's still a mess sometimes.
-Due to the implicit type parametrism already described, a lot of things are already overloaded. Overloading with different numbers of arguments and different sequences of restricted type signatures and possibly specializations are all permitted, somewhat similar to C++. There are some differences though, related to named parameters and defaulted (named) parameters. Parameters passed into anything must either all be named or all without names. When not all parameters are used (i.e. some are left to take either their type-default values or whatever default values have been given in the entity being called with them), only named parameters are allowed, to provide for reduced confusion probability and for great flexibility and readability. Essentially, this means that only what is really necessary for a particular call has to be mentioned by the human, and in arbitrary order, which is much better than having several NULLs or 0s or falseS or empty iterators in a fixed-order long parameter list.
+44.2. Overloading : C++ overloading often creates confusion as a human can't always predict which overloaded variant the language rules and the actual compiler will match. Even without implicit conversions between types, it could still be a mess sometimes. Besides, having exactly the same human-visible symbol name (i.e. before mangling, which is something the compiler does in ways which are not necessarily human-readable) with structural differences in the argument list (number of arguments passed etc.) and also possibly (substantially) different semantics. Therefore, the language chooses a different approach to (partial) overloading. The approach is designed to play well with named parameters and defaulted (named) parameters. First of all, only one symbol of a certain name is allowed in the source of a module (repeating it is an Attempted Redefinition Error). Parameters passed into anything must either all be named or all without names. When not all parameters are used (i.e. some are left to take either their type-default values or whatever default values have been given in the entity being called with them), only named parameters are allowed, to provide for reduced confusion probability and for great flexibility and readability. Essentially, this means that only what is really necessary for a particular call has to be mentioned by the human, and in arbitrary order, which is much better than having several NULLs or 0s or falseS or empty iterators in a fixed-order long parameter list.
 
-Overload resolution rules are different from e.g. C++ as there is NO IMPLICIT CONVERSION BETWEEN TYPES.
-Rule 1: First, all potentially applicable declarations of the symbol name in the compilation unit (normally the module, unless the coe is being entered interactively at a prompt) are loaded into a table. In the source code, they must always be declared contiguously, i.e. one after the other with no other declarations in-between.
-Rule 2: The variants which have the same number of formal parameters (no matter defaulted or not) are grouped together.
-Rule 3: If there are variants whose 
+The language allows specializations for types, as often it makes sense or is necessary to have *implementation* versions which are tailored/optimized/adapted to the particular properties of a type, with the convention that the basic meaning and behaviour have to stay the same for all specilized variants (if they can't or shouldn't, it's simply a bad thing to use the same symbol name for them!). This is treated as an *implementation* detail, in contrast to C++, and is therefore put in the body of the function/method/property/class declaration/definition; of course, the compiler will note the variants of the interface, likely in a fashion akin to the mangling in C++, but that is done internally and should be somewhat transparent to the client programmer.
+
+The specialization syntax is something like this:
+def method op+ (x ResizableArray, y)
+	if y.Type == bool
+		//Do it compactly, by packing bits.
+	else
+		if x.Full
+			//Try to grow; if unsuccessful, Error...
+		else
+			x(pos) := y		//Type of x is used to deduce that the array and therefore the ResizableArray
+			x.pos++
+		end if
+	end if
+end method op+	//Not final syntax... just there.	
+
+
 
 any any
 int int
