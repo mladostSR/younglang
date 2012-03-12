@@ -369,11 +369,44 @@ So:
 - Compilation then does parsing, instantiation, checks, some sort of code generation, and outputs messages and, of course, the new "object code" file (or rather an intermediate representation such as... yeah, C/C++ ! That's right!) and MIF. Caching may apply.
 - This is repeated until all the files given to the compiler driver at the command line have been processed. ??Check build dependencies and automatically build only what needs to be rebuilt.
 - Compilation of the IR code follows, using whatever suitable tools(s). Linking of the real object code follows. Hopefully there's a working executable in the end.
+- Compiler Driver/Build Automation Manager <-> Compiler Frontend <-> High-level IR Generation <-> High-Level  Analysis (Dataflow, Types, Scopes, Verification of Invariants, Pre-  and Postconditions, etc.) <-> optional: High-Level IR Optimization <-> Backend: { High-Level IR to Low-Level IR (C, C++ code) | Interpreter | JIT } <->  { C/C++ compiler | Dumps from Interpreter/JIT }.
+HLIR : not bytecode, but compact textual (=> human-readable) representation of what the high-level language constructs turn into. Syntax tree meets a very veru high-level assembler, sort of.  Object-based - it's essentally code objects which the subsequent stages consume.
+All sorts of source-level constructs are translated into HLIR.
+- Type declarations/definitions, Interfaces, Collections, User-defined types, Access/Selection operations, arithmetic and IO operations, abstract or not so abstract operations on class types, public vs. private, control flow - everything is written down in HLIR form.
+- Clever IR techniques will allow good compilation speed, code modularity, compiler toolchain modularity, analysis 
+and verification, etc. A well-designed and powerful HLIR will be critical to enabling effective and efficient 
+parametrism and all sorts of caching opportunities.
 48. Access permissions.
+Access permissions are conceptually the following:
+Within a package, modules can be either public or private in their entirety.
+Within a module, entities can be either public or private in their entirety.
+If a module is declared private in the package, nothing in it is visible outside of the package.
+If a module is declared public in the package, only public components of the module are visible outside of the package.
+Every component of a module is visible to every other component the same module.
+Every module inside a package is visible to every other module in the same package.
+Types permit varying levels of access to their internals, irrespective of any higher-level access permissions (i.e. there is *no complex interplay between access permissions*).
+Invariants can be defined as suitable expressions and actions to be used for static and run-time verification/testing/debugging. Any type, object, module, and package can have invariants defined. Invariant checking is *distinct from ordinary operations-supporting checking of conditions*, e.g. when a dynamically resizable container is checking internally to see if it has enough room for a new element or needs to grow it is *not* an invariant. Invariants are expected to be more or less "heavy", so they must be switchable on/off:
+- There must be a way to mark certain few invariants, either in specific code locations or for entire code units such as types, modules (no matter at which level they are located) as correctness- and security-critical. Those can *not* be switched off at all.
+- There must be a way to mark other invariants as "optional", i.e. conceptually they should be allowed to run in production mode if the machine is considered to have enough resources to do it, but easily switchable on/off via an application-global boolean flag at the commandline which starts the application or an environment variable, or even specified while the application is running (e.g. from a menu option like "Turn diagnostics on/off"). These should have at most only a single boolean test CPU overhead when inactive and moderate CPU and RAM/cache overhead when active; their space overhead for being present in the executable's code and data sections should also be moderate. What is meant by moderate is on the order of several 10s of %, and not several times the values of the core program.
+-There must be a way to create variants of a program for "purely DEBUG", arbitrarily-high-overhead features, which can be requested to be or not be compiled at all (so they can be skipped as early in source code and library IR as possible, avoiding overburdening of later stages in the pipeline).
+- Prevalent issues and invariants:
+-- Numerical overflow/underflow checks for primitive types are available as built-in invariants :  used as a built-in "pragma numerical_type_checks [on|off]" or annotation? ??Redundancy?
+-- Null reference dereferencing is always checked unless proven unnecessary, but the creation and assignment and thus propagation of null references is *not* checked for and is considered OK and necessary in many cases. But sometimes one wants to make sure that a variable can't even become null silently, or that an entire code region is free of nulls. These are available via "pragma no null [on|off]" and by annotation for a variable, parameter, or field "@no null". The opposite to "@no null" is "@allow null".
+
+- Classes don't allow direct messing with their internals, possibly abstract or intricate, data fields. Access to them is always indirect through Properties and as a side effect of calling Methods (which modify what they need to modify, and read and convert what they need to - without the outside world ever knowing anything particular). No Properties are synthesized by default - you have to ask for it (you==the maker of the class, not the client).
+- Structs are the opposite : they allow direct access from the outside world, unless told otherwise. If and when a Property is defined for a struct, it automatically forbids direct access to data field inside the struct it refers to.
+- Type invariants may be defined for both structs and classes, and are enforced. ??When? When crossing module boundaries, when performing any access to a type/type instance, or? What about overlap with Properties and other internal checking? Don't encourage redundant features!
+- Primitive types are open to any access in general. Primitive type variables and constants are only protected by being included in invariant declarations.
+- 
 49. Functions, methods, properties, functional objects and types, closures and lambda expressions, callables. Delegation.
 
 50. Loops, iteration and iterators. Container access and access to data in general. -> Accessors/accesses. Capabilities-based? Fail-fast?
-51.
+51. Invariants
+- Type invariants
+- Module invariants : statically checked and/or runtime-checked every time a module is "entered"/"exited"
+- Function, method, and property invariants
+52. Significant comments, aka annotations
+53. Ordinary comments and (semi-automatic) documentation  generation
 49. Tasking, concurrency, parallelism.
 Scheduling
 Non-blocking IO.
