@@ -475,3 +475,43 @@ any any
 int int
 any int
 int any
+
+Dynamic dispatch :
+- Via interfaces correspondence.
+- For structs and primitive types, virtual dispatch not needed.
+- For class types, virtual dispatch is the norm with frequent devirtualization opportunities.
+How to do it?
+In C++ / Java, where nominal typing is used, constructing vtables is simpler (and potentially more efficient). In C++, unless casting down inheritance chains, RTTI is not even necessary (a single vpointer to a per-class vtable is sufficient for a single inheritance, for multiple inheritance, a vpointer is usually needed per parent class). In Go, things are more dynamic, and closer to what is needed here. But the runtime overhead is likely to be higher than for C++ or Java, at least sometimes. Go's interfaces which are a key to duck typing are somewhere in-between static and dynamic typing.
+This languages's types are all rooted at the pseudo-Interface {} / Object pseudo-class.
+It should not incur any space or speed overhead.
+if object is of primitive type then treat it as being of a static type;
+if object is of struct type then it as being of a static type;
+if object is of possibly dynamic but statically known type then treat it as being of a static type;
+if object is treated as being of a static type then resolve calls and accesses statically and emit zero-overhead call.
+if object is not treated as being of a static type then do dynamic resolution aka virtual dispatch.
+
+Here, a class type may implement a large number of interfaces (as opposed to a small compile-time fixed number in nominally typed languages). Therefore, it is either not feasible or impractical to record all the possible interfaces in the per-class-type table. It is not an option to carry a vpointer per individual function or property, either (huge bloat of objects). Instead (somewhat like in Go, perhaps much like in Go, as their approach isn't completely solidified):
+A class object requires the dynamic mechanism only when it is not being treated as being of a static type. This is likely to happen in some container contexts, but also in some generics parameterized contexts. In such contexts, the class object is necessarily being access through a reference of the respective interface type (otherwise the actual type would be statically known).
+
+!See this about how it's done in Go: http://research.swtch.com/interfaces 
+
+
+Interfaces obviously don't nest. They compose additively in breadth, not in depth.
+
+What about the copying of the objects being pointed to which is what the Go implementation does? Heap allocation, etc. Hmm.
+
+The Go way of copying is often doing hidden *heap* allocation(s), which is not an entirely good thing.
+C++ / Java class hierarchies (but *not* Java Interfaces) need only read-only vtables.
+The core language must remain very useful for small embedded system development. The heap-allocating approach definitely isn't apt for that.
+But then, any reflection or reflection-like stuff isn't good for such uses, as are a lot of highly abstract constructs. So it might be OK to simply say NO Go-like interfaces in "small embedded" mode. Different versions of some classes and notably containers will anyway have to be used in really constrained devices.
+
+Is size of a struct (or any type for that matter) part of its full interface, or not? Should it be allowed to leak (implicitly or explicitly) or not? It seems only pointers/references are immune to size changes of the underlying implementation; but even they are machine-dependent and sometimes even execution-code-model dependent. However, it's the best we have in terms of interface stability. A TRULY OPAQUE OR REPURPOSABLE TYPE SHOULD BE PASSED AROUND ONLY AS A POINTER/SMART POINTER. Hmm. Scalarization is a valuable optimization for some uses on some many-register architectures, and it needs (is enabled by) pass-by-value of small structs/classes - but probably modern C/C++ compilers can use it even when at the source level pass-by-reference is used?
+
+It seems that simple, safe, and very machine-efficient type systems are kind of the "Pick any two, as you can't have all three at the same time."
+
+A stable ABI may contradict with allowing the compiler to do efficient compilation (e.g. allowing it to choose between passing a struct by value or by reference). So again it seems the best way to build highly consistent AND high-performance systems is by doing it from source and not using precompiled object files/libraries. Hmm.
+
+An alternative type system and related:
+- Scalar types (native types except pointers). Pure Values.
+- Value Structs : Pure value flavor which is not allowed to contain any reference at all and has no identity apart from its value. Private/public members; bound methods defined in the same module; only constructor/initializer and destructor/finalizer defined inside the declaration, as well as the type invariant(s).
+- Reference Structs : Reference-containing flavor which has at least 1 reference member. Has no identity apart from its value
