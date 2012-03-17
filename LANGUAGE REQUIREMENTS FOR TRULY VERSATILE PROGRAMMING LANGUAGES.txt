@@ -505,6 +505,9 @@ C++ / Java class hierarchies (but *not* Java Interfaces) need only read-only vta
 The core language must remain very useful for small embedded system development. The heap-allocating approach definitely isn't apt for that.
 But then, any reflection or reflection-like stuff isn't good for such uses, as are a lot of highly abstract constructs. So it might be OK to simply say NO Go-like interfaces in "small embedded" mode. Different versions of some classes and notably containers will anyway have to be used in really constrained devices.
 
+!!!
+Why not really have the two modes -- that of using C++-style virtual methods and that of Go's more general interfaces -- coexist in the language? For "small embedded" mode, avoid+forbid Go-style interfaces; for "general application" mode use both or the Go style exclusively? It seems the Go approach is a semantic superset of the C++ compile-time virtuals.
+
 Is size of a struct (or any type for that matter) part of its full interface, or not? Should it be allowed to leak (implicitly or explicitly) or not? It seems only pointers/references are immune to size changes of the underlying implementation; but even they are machine-dependent and sometimes even execution-code-model dependent. However, it's the best we have in terms of interface stability. A TRULY OPAQUE OR REPURPOSABLE TYPE SHOULD BE PASSED AROUND ONLY AS A POINTER/SMART POINTER. Hmm. Scalarization is a valuable optimization for some uses on some many-register architectures, and it needs (is enabled by) pass-by-value of small structs/classes - but probably modern C/C++ compilers can use it even when at the source level pass-by-reference is used?
 
 It seems that simple, safe, and very machine-efficient type systems are kind of the "Pick any two, as you can't have all three at the same time."
@@ -513,5 +516,20 @@ A stable ABI may contradict with allowing the compiler to do efficient compilati
 
 An alternative type system and related:
 - Scalar types (native types except pointers). Pure Values.
-- Value Structs : Pure value flavor which is not allowed to contain any reference at all and has no identity apart from its value. Private/public members; bound methods defined in the same module; only constructor/initializer and destructor/finalizer defined inside the declaration, as well as the type invariant(s).
-- Reference Structs : Reference-containing flavor which has at least 1 reference member. Has no identity apart from its value
+- Value Structs : Pure value flavor which is not allowed to contain any reference at all and has no inherent identity apart from its value. Private/public members; bound methods defined in the same module; only constructor/initializer and destructor/finalizer defined inside the declaration, as well as the type invariant(s). Causes no refcount updates or anything costlier if copied.
+- Reference Structs : 
+-- Reference-containing flavor which has at least 1 reference member. If it contains only unique references, it will not cause sharing but instead transfer of ownership if copied. If the older copy outlives the younger copy (which is extremely likely), the older copy will lose the pointed-to object to the younger copy (unless it back-returns it).
+-- If the struct contains only sharing references, it will cause sharing and no transfer of ownership - i.e. likely incur refcount update overhead (if not elided by compiler) but nothing costlier will happen.
+-- If the struct contains a mix of unique and sharing references, behaviour will be a mix of the above behaviours.
+
+If the alternative approach is chosen : not copying reference-containing structures unless explicitly requested, but only copying references (or transferring their ownership), is clearer semantics assured? In a way - yes, because it remains clearer that several names exist for the same object in memory, and diamond-shaped paths are made less likely. Less time and memory is spent on dealing with fewer refcounts, too.
+-- Classes can also be reference-containing or not, and can also have the 3 populations of references.
+
+It seems that using references to work with reference-containing types is the better strategy. Fits well with tracing GCs (Java, etc.) and also with refcounting.
+
+So:
+All pure-value types, which includes primitive types except pointers, all primitive-wrapping types (including smart pointers), all enums, all pure value structs, and all pure-value classes are safely and cheaply and un-confusingly copiable and movable.
+All reference-containing types (not the smart pointers themselves!)  are to be considered reference types, and accessed and passed around as references (compiler optimizations must maintain the illusion if it's really true).
+Both pv and ref types can be accessed via references and passed by reference.
+Both pv and ref types can be allocated on stack or on heap.
+Reference types must require an explicit copy() operation. PV types ??
