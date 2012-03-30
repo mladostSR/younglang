@@ -1,0 +1,24 @@
+DOMAIN-SPECIFIC LANGUAGES and LANGUAGE EXTENSIBILITY
+
+- A rich core language must be fixed and always available (with features added or removed by application profiles).
+- The language must be flexible, expressive, and intelligible enough to be useful for many domains without modification.
+- When modification is indeed necessary, the core language and standard extensions must provide structured interfaces to allow for DSL creation and processing.
+
+A possible mechanism is to allow special packages to cause the automatic invocation of custom trnsaltion modes/translators, e.g.:
+//
+using package dsl
+my_dsl := dsl.create.generic_dsl()
+my_dsl.add_language_construct(syntax="Moo!", syntax_action=default, semantic_action=
+	local
+		io.console.write("Moo!")
+	end local
+)
+my_dsl.add_tag("CowDSL")
+my_dsl.finish()
+
+//
+io.cosnole.write("Will begin using the DSL")
+CowDSL Moo!
+...
+
+A DSL is, of course, transformed to either  native code compiled as usual or is left in a textual interpretable form, to be run via an interpreter at runtime. The API for DSL handling must provide the support.

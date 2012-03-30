@@ -19,3 +19,6 @@ So, perhaps classification could be taken a bit further:
 
 In general, it seems that the notion of execution mode/ execution correctness and safety level should be made a first-class concept, and be modelled and manipulated as a (simple) finite state machine. There's nothing completely wrong with individual error and exception-handling constructs and mechanisms in languages like C, C++, Java - they all work more or less and they are all useful more or less and they all are (in)convenient more or less; the problem is that they are all focused on lower-level mechanics rather than the program or application as a whole and that makes them less useful and flexible than they could be.
 
+The possible transitions and mechanisms need careful consideration.
+Execution correctness and safety level must compose well across all application levels : from individual statements/expressions/operat(ors|ions) through subroutines and tasks to distributed large-scale systems. Execution correctness and safety level must be expressible and notifiable across their boundaries.
+
