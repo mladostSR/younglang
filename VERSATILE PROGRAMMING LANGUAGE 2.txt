@@ -97,9 +97,86 @@ Actually, there can be several scenarios:
 If there is long-running processing between gather and scatter in 3., support should be provided for another transaction preempting the long-running one. Read ops of the original data will not cause abort, but write will (as data will have changed in the meantime).
 Transaction ordering and prioritization may very much alleviate non-determinism concerns.
 
-When CPUs become able to lock multiple cache lines, it will all be so much easier...
+When CPUs become able to lock multiple cache lines, it will all be so much easier... Haswell coming but not so soon...
 
+If type or var not marked as concurrent : don't allow use in concurrent context (i.e. passing into a Task-related procedure).
+If type or var is concurrent-enabled/wrapped, then all operations inside it are by default subject to transaction control??
 
+Transferred variables : OK.
+What about those which can't and so haven't been transferred but need to be accessed from time to time, like e.g. some I/O object? Transfer is good for task data handoff, but not for dynamic situations which are common in GUIs, servers, other interactive apps?
+A "borrow" mechanism is needed then. Temporary transfer of ownership (access), which causes the owner-in-principle to be unable to use the variable. If all concurrent vars are implemented as references, then a single atomic CAS or even atomic INC/DEC will be enough to safely and quickly transfer ownership. But what should the owner-in-principle do? It must assume that the reference may be borrowed at any time (which is closer ot being stolen!) and then perform checks and busy-wait or something else. Gets bad quickly. Asynchronous ownership transfer is hard to use as most async things are. Plus, it's kind of like it's not clear who's the owner of the object in question -- which is a violation of the single owner principle!
+So, better have a clear single owner of concurrently-accessible mutable variables : the transaction/concurrent access manager!
+Declared a type or object as concurrent => it's owned by the TM/CA; you don't get the actual object but a handle to it. Something like a weak reference : correct, as you don't own it!
+Then, whenever someone needs to perform anything on the object, it asks the TM to either do it on the requester's behalf or to assign the object to the requesting task and prevent anyone else from touching it until further notice.
+When an operation involves multiple objects, they are simply all passed to the TM/CA.
+In a transaction request, only concurrent enabled objects are allowed.
+In case there are operations and side effects which belong to the code block inside the transaction but don't really need to be transactional, an escape block can be used.
+The biggest difficulty is with function/procedure handling calls and I/O or syscalls. Exceptions and errors, too.
+Irrevocable ops?
+
+def procedure concurrent sqrt_wrapper (IN x number, IN y number, OUT z number, INOUT counter_attempts number)	//restricted polymorphism : only numerical types allowed
+begin atomic
+counter_attempts++
+if x < y
+	abort
+else
+	if z null
+		abort noretry	"OUT parameter z is null" //No auto-retry of transaction - retrying won't fix z being unallocated
+	else
+		def tmp := x-y	//guaranteed to be >= 0
+		z := sqrt( tmp )	//OK as tmp >= 0
+	end if
+end if
+end atomic
+end procedure concurrent
+
+def count uint16	//default-init to zero<type> which is 0 for an int
+def x := 0.0, y := 1.0, z := OUT	//z is explicitly left uninitialized in expectation of being written to 
+	
+
+TM/CA:
+One global, per-program entity, possibly with Execution-domain-level, Thread-level, etc. assistants/subordinates.
+Creation of transactional objects:
+
+ transactional x := create TypeName([<<construction params>>]) [concurrent access policies]
+
+ Concurrent access policies can be various...
+ 
+ At the end of scope, refcount of the actual concurrent object is decremented.
+ Module-level concurrent objects are also refcounted. Globals which actually live in the global module??
+ When the refcount drops to 0, there can be no further uses => object is deleted.
+ 
+ The "concurrent x" is a handle on the object. All and any access happens through that handle.
+ A transaction is then a logically atomic operation which is executed under the TM/CA and BY the TM/CA, on behalf of the requesting task.
+ A transaction is nothing more than a specially formulated and packaged task which is given to the TM/CA to execute.
+ tr := [deferred] transaction { /*protected stuff*/ }
+ Deferred transactions are launched on demand, possibly many times. A bit like stored procedures in a DBMS.
+ Non-deferred transactions are launched immediately when constructed.
+ When the compiler sees a transaction definition, it does:
+ - Extract the list of mentioned non-immutable objects;
+ - Peek into the mentioned functions and procedures (recursive scan). If they contain mentions of non-immutable transactional objects, they are added to the list.
+ - Functions and procedures require no special transactional marking if they contain only allowed operations. Some kinds of operations are generally not permitted inside transactions, however : direct hardware access (ports, MMIO, ...), direct memory access, network IO, filesystem IO, queue accesses etc. The reason is that those are not (easily) revocable. The user is required to either use custom buffering schemes, or the specilized transaction-safe variants provided by the language.
+ - If mutable non-transactional objects are mentioned, it is a compilation error. If the programmer does indeed want to use them inside a transaction, they must be marked in the text of the transaction block as non-transactional. Such objects are left entirely to the care of the programmer.
+ - If the programmer wishes, an entire expression or statement, possibly including arbitrary calls, can be put inside an explicit non-transactional block.
+ - Inside a transaction block, in a transaction context, the "_TRANSACTION_" "macro" is defined as true; in non-transactional escape blocks, it's set back to false.
+ - Whenever in transaction context, a set of abort/retry current/... constructs are allowed to allow flexibility and expressivity.
+ - Transactions, being special tasks, allow for partially concurrent execution. A transaction task can contain task-parallel and data-parallel constructs, with some limitations, of course.
+ - Memory and other resource allocations/reservations made inside a transaction task are freed when an attempt fails, and reacquired on a next attempt (some resources may be cached). When a transaction task is exited for good, everything is deleted. Objects initialized are deleted, too, and so on. Thus, a transaction task acts like any other task or simple scope.
+ - Transactions compose the way ordinary tasks compose.
+ - What the TM/CA does :  it (re)orders/monitors/traces operations and ensures they are not interfering with one another. A very simple TM/CA will just grab transaction tasks off a single queue and execute them sequentially. A more sophisticated one will do finer stuff, like RCU, fine-grained locking, virtual machine interpretation, memory shadowing, shadowing of other resources, conflict detection, etc.
+
+ 
+ 
+ 
 
 -- Support for region-based allocation. Named regions.
+Regions are conceptually contiguous blocks of (virtual) memory, intended to permit quick allocation and release in one go. So, it's similar to both a buffer and a separate non-contended-for arena.
+There are two kinds of regions : one for objects which require no destruction/finalization and the second for objects which (may) require that.
+ def x:= new string(reserve:80) within rgn1
+ ....
+ delete region rgn1
+ 
+ Stuff allocated within a region is NOT allowed to have references to anything outside the region; the region has a single owner - the region descriptor (a kind of unique ref), and all access must go through it. Taking direct references to objects inside it is forbidden and prevented. An object must be explicitly copied out of the region.
+ When a region is deleted, destructors/finalizers are run, 
+ 
 
